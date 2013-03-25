@@ -21,38 +21,41 @@ class EmaileratorEvent extends MyCrud {
     // Call the baseclass function
     parent::DeleteByID($argsArray);
     
-    // Email everyone who was going (or potentially going) to let them know
-    $template = "../emailerator/template.EmaileratorCancel.php";
+    // Email everyone who was going (or potentially going) to let them know - unless the event is in the past
+    if ($eventArray['EventDateTime'] > (time() * 1000) )
+    {
+      $template = "../emailerator/template.EmaileratorCancel.php";
 
-    $attendingQueryString = "SELECT * FROM Attending WHERE EventID=" . $argsArray['id'];
-    $attendingResult = $this->dbHandle->query($attendingQueryString);
+      $attendingQueryString = "SELECT * FROM Attending WHERE EventID=" . $argsArray['id'];
+      $attendingResult = $this->dbHandle->query($attendingQueryString);
 
-    while ($attendingRow = $attendingResult->fetch_object()) {
+      while ($attendingRow = $attendingResult->fetch_object()) {
 
-      $attending = $attendingRow->Attending;
-      if (($attending == "Yes") || ($attending == "Unknown")) {
+        $attending = $attendingRow->Attending;
+        if (($attending == "Yes") || ($attending == "Unknown")) {
       
-        $userQueryString = "SELECT * FROM User WHERE ID=" . $attendingRow->UserID;
-        $userResult = $this->dbHandle->query($userQueryString);
-        $userArray = $userResult->fetch_assoc();
-        mysqli_free_result($userResult);
+          $userQueryString = "SELECT * FROM User WHERE ID=" . $attendingRow->UserID;
+          $userResult = $this->dbHandle->query($userQueryString);
+          $userArray = $userResult->fetch_assoc();
+          mysqli_free_result($userResult);
 
-        $userName = $userArray['Name'];
-        $firstName = substr($userName, 0, strpos($userName, " "));
-        $miliseconds = $eventArray['EventDateTime'];
-        $dateString = date('D, jS M Y \a\t g:iA', $miliseconds / 1000);
+          $userName = $userArray['Name'];
+          $firstName = substr($userName, 0, strpos($userName, " "));
+          $miliseconds = $eventArray['EventDateTime'];
+          $dateString = date('D, jS M Y \a\t g:iA', $miliseconds / 1000);
 
-        $otherBitsArray = array("FirstName" => $firstName, "UserID" => $attendingRow->UserID, "DateTime" => $dateString);
+          $otherBitsArray = array("FirstName" => $firstName, "UserID" => $attendingRow->UserID, "DateTime" => $dateString);
 
-        $cancelArgsArray = array_merge($eventArray, $otherBitsArray);
+          $cancelArgsArray = array_merge($eventArray, $otherBitsArray);
 
-        sendOneEmail($userArray['Email'], $userArray['Name'], "Event cancellation notice!", $template, $cancelArgsArray);
+          sendOneEmail($userArray['Email'], $userArray['Name'], "Event cancellation notice!", $template, $cancelArgsArray);
+        }
+
       }
-
+      mysqli_free_result($attendingResult);
     }
-    mysqli_free_result($attendingResult);
 
-    // Then remove entries from Attending
+    // Remove entries from Attending
     $this->dbHandle->query("DELETE FROM Attending WHERE EventID=" . $argsArray['id']);
     
     // Update the log    
